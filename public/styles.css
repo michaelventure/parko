@@ -1,0 +1,422 @@
+/* =========================================================
+   Parko — hoja de estilos accesible
+   Principios: contraste alto, texto grande, objetivos de toque
+   amplios, foco muy visible, sin depender solo del color,
+   compatible con zoom de texto y con modo oscuro del sistema.
+   ========================================================= */
+
+:root {
+  --color-text: #0b0c0c;
+  --color-text-muted: #454c53;
+  --color-bg: #ffffff;
+  --color-bg-alt: #f1f4f7;
+  --color-border: #b6c0c9;
+  --color-primary: #10508f;
+  --color-primary-dark: #0b3a68;
+  --color-success: #00703c;
+  --color-success-dark: #00532d;
+  --color-danger: #d4351c;
+  --color-danger-bg: #fbe9e6;
+  --color-focus: #ffdd00;
+  --radius: 10px;
+  --max-width: 40rem;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: #f3f5f7;
+    --color-text-muted: #c3ccd4;
+    --color-bg: #10151a;
+    --color-bg-alt: #1b232b;
+    --color-border: #3a4750;
+    --color-primary: #6cb2ff;
+    --color-primary-dark: #9fcdff;
+    --color-success: #3ddc84;
+    --color-success-dark: #6ee6a0;
+    --color-danger: #ff8a75;
+    --color-danger-bg: #3a1f1a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Safari (WebKit) aplica su propio estilo nativo a botones e inputs
+   (bordes, degradados, radios) que pisa el diseño personalizado si no se
+   resetea explicitamente. */
+button,
+input {
+  font: inherit;
+  color: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* Respeta el tamaño de fuente que el usuario configuró en su navegador. */
+  font-size: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* --- Enlace "saltar al contenido" para usuarios de teclado/lector de pantalla --- */
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 var(--radius) 0;
+  z-index: 100;
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* --- Foco visible en TODO elemento interactivo (crítico para accesibilidad) --- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Respaldo para Safari antiguo (<15.4) sin soporte de :focus-visible:
+   mejor mostrar el foco siempre que perderlo por completo. */
+@supports not selector(:focus-visible) {
+  a:focus,
+  button:focus,
+  input:focus,
+  [tabindex]:focus {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* --- Encabezado --- */
+.site-header {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 1.25rem 0;
+}
+.site-header .brand {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.site-header .tagline {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+  opacity: 0.92;
+}
+
+main {
+  padding: 2rem 1.25rem 3rem;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+  line-height: 1.25;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1.4rem;
+  margin: 0 0 0.75rem;
+}
+
+.lead {
+  color: var(--color-text-muted);
+  font-size: 1.15rem;
+  margin: 0 0 2rem;
+}
+
+/* --- Formulario --- */
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 2rem;
+  /* Bug conocido de WebKit/Safari: <fieldset> no encoge por debajo del
+     ancho intrinseco de su contenido, lo que puede desbordar o romper
+     grids/flex hijos. min-width:0 lo corrige. */
+  min-width: 0;
+}
+
+legend {
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 0;
+  margin: 0 0 0.9rem;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+input[type="text"] {
+  width: 100%;
+  font-size: 1.15rem;
+  padding: 0.9rem 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 3.25rem;
+}
+
+/* --- Rejilla de opciones de tiempo (botones grandes tipo tarjeta) --- */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.9rem;
+}
+
+.preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  padding: 0.9rem 0.75rem;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg-alt);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: center;
+}
+
+.preset-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.preset-btn .preset-hours {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.preset-btn .preset-price {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.preset-btn[aria-pressed="true"] {
+  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  color: #fff;
+}
+.preset-btn[aria-pressed="true"] .preset-price {
+  color: #eaf2fb;
+}
+.preset-btn[aria-pressed="true"]::before {
+  content: "✓ ";
+  font-weight: 800;
+}
+
+/* --- Resumen de precio --- */
+.summary-card {
+  background: var(--color-bg-alt);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.summary-label {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+}
+
+.summary-amount {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
+  font-weight: 800;
+}
+
+/* --- Botones de acción principal --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 3.75rem;
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0.9rem 1.5rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-success);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-success-dark);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.btn-secondary:hover {
+  background: var(--color-bg-alt);
+}
+
+/* --- Mensajes de estado (error / éxito / info) — nunca solo por color --- */
+.banner {
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.05rem;
+  border: 2px solid transparent;
+}
+.banner-error {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-text);
+}
+.banner-error::before {
+  content: "⚠ ";
+  font-weight: 800;
+}
+
+.field-error {
+  color: var(--color-danger);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: -0.75rem;
+  margin-bottom: 1.5rem;
+}
+.field-error::before {
+  content: "⚠ ";
+}
+
+/* --- Sección de ayuda --- */
+.help-section {
+  background: var(--color-bg-alt);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+.help-section ol {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+.help-section li {
+  margin-bottom: 0.5rem;
+}
+.help-section li:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Pie de página --- */
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  padding: 1.5rem 0 2.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+/* --- Páginas de confirmación / cancelación --- */
+.result-page main {
+  text-align: center;
+  padding-top: 3rem;
+}
+.result-icon {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+.result-card {
+  background: var(--color-bg-alt);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  text-align: left;
+  margin: 1.5rem 0;
+}
+.result-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+.result-card dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.result-card dd {
+  margin: 0;
+}
+
+/* --- Utilidades de estado de carga --- */
+[aria-busy="true"] {
+  opacity: 0.8;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Reduce animaciones si el usuario lo pidió en su sistema --- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

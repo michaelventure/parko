@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Pago recibido — Parko</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="result-page">
+  <header class="site-header">
+    <div class="container">
+      <p class="brand">🅿️ Parko</p>
+    </div>
+  </header>
+
+  <main class="container" id="main" aria-live="polite">
+    <div id="state-checking">
+      <p class="result-icon" aria-hidden="true">⏳</p>
+      <h1>Estamos confirmando tu pago…</h1>
+      <p class="lead">Esto toma solo unos segundos, no cierres esta página.</p>
+    </div>
+
+    <div id="state-paid" hidden>
+      <p class="result-icon" aria-hidden="true">✅</p>
+      <h1>¡Pago confirmado!</h1>
+      <p class="lead">Guarda o toma una foto de esta pantalla como tu comprobante.</p>
+      <div class="result-card">
+        <dl>
+          <dt>Ticket</dt>
+          <dd id="detail-id">—</dd>
+          <dt>Tiempo pagado</dt>
+          <dd id="detail-hours">—</dd>
+          <dt>Placa</dt>
+          <dd id="detail-plate">—</dd>
+          <dt>Monto pagado</dt>
+          <dd id="detail-amount">—</dd>
+          <dt>Fecha de pago</dt>
+          <dd id="detail-paid-at">—</dd>
+        </dl>
+      </div>
+      <a class="btn btn-secondary" href="/">Volver al inicio</a>
+    </div>
+
+    <div id="state-pending" hidden>
+      <p class="result-icon" aria-hidden="true">⏳</p>
+      <h1>Tu pago sigue en proceso</h1>
+      <p class="lead">
+        A veces la confirmación tarda un poco más. Guarda este número de ticket
+        y verifica de nuevo en un momento.
+      </p>
+      <div class="result-card">
+        <dl>
+          <dt>Ticket</dt>
+          <dd id="detail-id-pending">—</dd>
+        </dl>
+      </div>
+      <button type="button" class="btn btn-primary" id="retry-button">Verificar de nuevo</button>
+    </div>
+
+    <div id="state-error" hidden>
+      <p class="result-icon" aria-hidden="true">⚠</p>
+      <h1>No pudimos encontrar tu ticket</h1>
+      <p class="lead">Si el pago se realizó, contacta a soporte con el número de sesión que tienes en tu correo de Stripe.</p>
+      <a class="btn btn-secondary" href="/">Volver al inicio</a>
+    </div>
+  </main>
+
+  <script src="/success.js"></script>
+</body>
+</html>

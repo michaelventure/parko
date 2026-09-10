@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: parko_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parko}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parko}
+      POSTGRES_DB: ${POSTGRES_DB:-parko}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - parko_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parko} -d ${POSTGRES_DB:-parko}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parko_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-parko}:${POSTGRES_PASSWORD:-parko}@db:5432/${POSTGRES_DB:-parko}?schema=public
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+
+volumes:
+  parko_db_data:

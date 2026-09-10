@@ -1,0 +1,623 @@
+openapi: 3.0.3
+info:
+  title: Parko API
+  description: >
+    API de parqueo por hora multi-tenant. El precio y la disponibilidad se
+    calculan siempre en el servidor; el pago se verifica con Stripe antes de
+    marcar un ticket como pagado. Cada tenant (municipio o empresa) gestiona
+    su propia tarifa, capacidad y usuarios.
+  version: "2.0.0"
+servers:
+  - url: /api
+
+paths:
+  /auth/login:
+    post:
+      summary: Iniciar sesion (Admin General, Admin de Tenant o Usuario)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Sesion iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Correo o contraseña incorrectos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tenants:
+    get:
+      summary: Listar tenants (solo Admin General)
+      tags: [Tenants]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Lista de tenants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tenant"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Crear un tenant y su primer Admin de Tenant (solo Admin General)
+      tags: [Tenants]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantInput"
+      responses:
+        "201":
+          description: Tenant y admin creados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant:
+                    $ref: "#/components/schemas/Tenant"
+                  admin:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      email: { type: string, format: email }
+                      role: { type: string, enum: [TENANT_ADMIN] }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tenants/{id}/suspend:
+    post:
+      summary: Suspender un tenant (solo Admin General)
+      tags: [Tenants]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Tenant suspendido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /tenants/{id}/activate:
+    post:
+      summary: Reactivar un tenant (solo Admin General)
+      tags: [Tenants]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+      responses:
+        "200":
+          description: Tenant reactivado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users:
+    get:
+      summary: Listar usuarios de mi tenant (solo Admin de Tenant)
+      tags: [Users]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Usuarios del tenant del llamador
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Crear un usuario en mi tenant (solo Admin de Tenant)
+      tags: [Users]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantUserInput"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tariffs/active:
+    get:
+      summary: Obtener la tarifa activa de un tenant (publico)
+      tags: [Tariffs]
+      parameters:
+        - $ref: "#/components/parameters/TenantSlugQuery"
+      responses:
+        "200":
+          description: Tarifa activa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tariff"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /tariffs:
+    get:
+      summary: Listar las tarifas de mi tenant (solo Admin de Tenant)
+      tags: [Tariffs]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Lista de tarifas del tenant del llamador
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tariff"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Crear una nueva tarifa activa para mi tenant (solo Admin de Tenant)
+      tags: [Tariffs]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTariffInput"
+      responses:
+        "201":
+          description: Tarifa creada y activada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tariff"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /tariffs/{id}/deactivate:
+    post:
+      summary: Desactivar una tarifa de mi tenant (solo Admin de Tenant)
+      tags: [Tariffs]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TariffId"
+      responses:
+        "200":
+          description: Tarifa desactivada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tariff"
+        "403":
+          description: La tarifa no pertenece a tu tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /tickets:
+    post:
+      summary: Crear un ticket de parqueo para un tenant (publico; el precio se calcula en el servidor)
+      tags: [Tickets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketInput"
+      responses:
+        "201":
+          description: Ticket creado en estado PENDING_PAYMENT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          description: El tenant no existe o no tiene una tarifa activa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tickets/{id}:
+    get:
+      summary: Consultar el estado de un ticket (publico, por id opaco)
+      tags: [Tickets]
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      responses:
+        "200":
+          description: Ticket encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /tickets/{id}/checkout-session:
+    post:
+      summary: Crear una sesion de pago de Stripe Checkout para el ticket
+      tags: [Tickets]
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      responses:
+        "201":
+          description: Sesion de checkout creada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkoutUrl:
+                    type: string
+                    format: uri
+                  sessionId:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /capacity/availability:
+    get:
+      summary: Disponibilidad publica de un tenant (nunca negativa)
+      tags: [Capacity]
+      parameters:
+        - $ref: "#/components/parameters/TenantSlugQuery"
+      responses:
+        "200":
+          description: Espacios totales y disponibles ahora mismo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Availability"
+        "404":
+          description: El tenant no existe o no tiene capacidad configurada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /capacity/status:
+    get:
+      summary: Estado completo de capacidad de mi tenant, incluyendo sobrecupo (solo Admin de Tenant)
+      tags: [Capacity]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Estado de capacidad
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapacityStatus"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Mi tenant no tiene capacidad configurada todavia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /capacity:
+    post:
+      summary: Fijar un nuevo total de espacios para mi tenant y activarlo (solo Admin de Tenant)
+      tags: [Capacity]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCapacityInput"
+      responses:
+        "201":
+          description: Capacidad creada y activada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capacity"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /webhooks/stripe:
+    post:
+      summary: Webhook de Stripe (uso interno de Stripe, no invocar manualmente)
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Evento procesado (o duplicado ignorado)
+        "400":
+          description: Firma de webhook invalida o payload malformado
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenido en POST /auth/login. El rol (SUPER_ADMIN, TENANT_ADMIN, TENANT_USER) y el tenant van codificados en el token, nunca se envian por separado.
+
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TariffId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TenantId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TenantSlugQuery:
+      name: tenantSlug
+      in: query
+      required: true
+      description: Identificador publico del tenant (municipio/empresa)
+      schema:
+        type: string
+        example: "demo"
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflicto de estado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: No hay sesion valida (falta el token o expiro)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Hay sesion valida, pero el rol o el tenant no tiene permiso para esta accion
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Datos de entrada invalidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string, description: "JWT Bearer, incluir como Authorization: Bearer <token>" }
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            email: { type: string, format: email }
+            role: { type: string, enum: [SUPER_ADMIN, TENANT_ADMIN, TENANT_USER] }
+            tenantId: { type: string, format: uuid, nullable: true, description: "null solo para SUPER_ADMIN" }
+
+    Tenant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateTenantInput:
+      type: object
+      required: [name, slug, adminEmail, adminPassword]
+      properties:
+        name: { type: string, example: "Ayuntamiento Demo" }
+        slug: { type: string, example: "demo", description: "solo minusculas, numeros y guiones" }
+        adminEmail: { type: string, format: email, example: "admin@demo.parko.dev" }
+        adminPassword: { type: string, format: password, example: "una-contraseña-segura" }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [TENANT_ADMIN, TENANT_USER] }
+        tenantId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    CreateTenantUserInput:
+      type: object
+      required: [email, password, role]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password, example: "una-contraseña-segura" }
+        role: { type: string, enum: [TENANT_ADMIN, TENANT_USER] }
+
+    Tariff:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        name: { type: string }
+        ratePerHourCents: { type: integer }
+        dailyMaxCents: { type: integer }
+        currency: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateTariffInput:
+      type: object
+      required: [name, ratePerHourCents, dailyMaxCents]
+      properties:
+        name: { type: string, example: "Tarifa estandar" }
+        ratePerHourCents: { type: integer, example: 100 }
+        dailyMaxCents: { type: integer, example: 800 }
+        currency: { type: string, example: "usd" }
+
+    CreateTicketInput:
+      type: object
+      required: [tenantSlug, hours]
+      properties:
+        tenantSlug: { type: string, example: "demo" }
+        hours:
+          type: number
+          example: 3
+          description: Horas de estacionamiento solicitadas (0.5 a 24)
+        plate:
+          type: string
+          example: "A123456"
+
+    Availability:
+      type: object
+      properties:
+        totalSpaces: { type: integer }
+        availableSpaces: { type: integer, minimum: 0, description: "max(total - ocupados, 0) — nunca negativo" }
+
+    CapacityStatus:
+      type: object
+      properties:
+        totalSpaces: { type: integer }
+        occupiedSpaces: { type: integer, description: "puede superar totalSpaces (sobrecupo)" }
+        isOverflowingNow: { type: boolean }
+        lastOverflowAt: { type: string, format: date-time, nullable: true }
+        lastOverflowAmount: { type: integer, nullable: true }
+
+    CreateCapacityInput:
+      type: object
+      required: [totalSpaces]
+      properties:
+        totalSpaces: { type: integer, example: 40 }
+
+    Capacity:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        totalSpaces: { type: integer }
+        isActive: { type: boolean }
+        lastOverflowAt: { type: string, format: date-time, nullable: true }
+        lastOverflowAmount: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Ticket:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        plate: { type: string, nullable: true }
+        hoursRequested: { type: number }
+        tariffId: { type: string, format: uuid }
+        ratePerHourCentsUsed: { type: integer }
+        dailyMaxCentsUsed: { type: integer }
+        amountCents: { type: integer }
+        currency: { type: string }
+        status:
+          type: string
+          enum: [PENDING_PAYMENT, PAID, EXPIRED, CANCELLED]
+        stripeCheckoutSessionId: { type: string, nullable: true }
+        stripePaymentIntentId: { type: string, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        payerEmail: { type: string, format: email, nullable: true, description: "Capturado por Stripe Checkout al pagar" }
+        receiptEmailSentAt: { type: string, format: date-time, nullable: true, description: "Cuando se envio el correo de confirmacion (null si no se pudo enviar)" }
+        entryTime: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }

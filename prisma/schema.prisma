@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TicketStatus {
+  PENDING_PAYMENT
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum UserRole {
+  /// Gestiona tenants (crear/suspender). No opera tarifas ni tickets.
+  SUPER_ADMIN
+  /// Gestiona tarifa, capacidad y usuarios de su propio tenant.
+  TENANT_ADMIN
+  /// Rol operativo: ve tickets/disponibilidad, crea tickets y cobros.
+  /// No puede tocar tarifa, capacidad, ni gestionar usuarios.
+  TENANT_USER
+}
+
+/// Un cliente de la plataforma (municipio o empresa). Todo lo demas
+/// (tarifas, capacidad, tickets, usuarios) pertenece a un tenant.
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  users      User[]
+  tariffs    Tariff[]
+  capacities Capacity[]
+  tickets    Ticket[]
+}
+
+/// Cuenta con la que se inicia sesion (correo + contraseña). SUPER_ADMIN no
+/// pertenece a ningun tenant (tenantId null); TENANT_ADMIN y TENANT_USER
+/// siempre pertenecen a exactamente uno.
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  tenantId     String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+/// Tarifa vigente de parqueo de un tenant. Nunca se hardcodea en el codigo:
+/// se lee de la base de datos y se gestiona via API (/api/tariffs), y solo
+/// el TENANT_ADMIN de ese tenant puede cambiarla.
+model Tariff {
+  id                String   @id @default(uuid())
+  tenantId          String
+  name              String
+  ratePerHourCents  Int
+  dailyMaxCents     Int
+  currency          String   @default("usd")
+  isActive          Boolean  @default(false)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  tickets Ticket[]
+
+  @@index([tenantId, isActive])
+}
+
+/// Ticket de estacionamiento. El precio (amountCents) se calcula y persiste
+/// exclusivamente en el servidor a partir de la tarifa activa del tenant;
+/// el cliente solo envia las horas solicitadas. El estado solo pasa a PAID
+/// desde el webhook de Stripe, tras verificar la sesion de checkout.
+model Ticket {
+  id             String @id @default(uuid())
+  tenantId       String
+  plate          String?
+  hoursRequested Float
+
+  // Snapshot de la tarifa aplicada en el momento de creacion del ticket,
+  // para que cambios futuros de tarifa no alteren tickets ya emitidos.
+  tariffId             String
+  ratePerHourCentsUsed Int
+  dailyMaxCentsUsed    Int
+  amountCents          Int
+  currency             String
+
+  status TicketStatus @default(PENDING_PAYMENT)
+
+  stripeCheckoutSessionId String?   @unique
+  stripePaymentIntentId   String?
+  paidAt                  DateTime? @db.Timestamptz(3)
+
+  // Correo capturado por Stripe Checkout al pagar (no se pide en el
+  // formulario publico). receiptEmailSentAt registra si el correo de
+  // confirmacion se envio realmente, para auditoria.
+  payerEmail         String?
+  receiptEmailSentAt DateTime? @db.Timestamptz(3)
+
+  entryTime DateTime @default(now()) @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tariff Tariff @relation(fields: [tariffId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([stripeCheckoutSessionId])
+}
+
+/// Registro de eventos de Stripe ya procesados, para garantizar idempotencia
+/// del webhook (Stripe puede reintentar la entrega del mismo evento).
+model StripeWebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+/// Capacidad total de espacios de parqueo de un tenant. Sin sensores:
+/// "ocupado" se aproxima contando tickets PAID de ese tenant cuya ventana
+/// [entryTime, entryTime + hoursRequested] sigue vigente. lastOverflowAt/
+/// lastOverflowAmount se registran cuando un pago confirmado empuja el
+/// conteo por encima del total, para que el TENANT_ADMIN decida si ajusta
+/// la capacidad.
+model Capacity {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  totalSpaces        Int
+  isActive           Boolean   @default(false)
+  lastOverflowAt     DateTime? @db.Timestamptz(3)
+  lastOverflowAmount Int?
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, isActive])
+}

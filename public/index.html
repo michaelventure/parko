@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Parko — Parqueo por hora</title>
+  <meta name="description" content="Paga tu parqueo por hora de forma rápida y segura." />
+  <!-- Identifica a que tenant (municipio/empresa) pertenece esta pagina.
+       Cada despliegue publico apunta a un tenant distinto cambiando esto. -->
+  <meta name="parko-tenant" content="demo" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido principal</a>
+
+  <header class="site-header">
+    <div class="container">
+      <p class="brand">🅿️ Parko</p>
+      <p class="tagline">Parqueo por hora — pago seguro con tarjeta</p>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    <h1>¿Cuántas horas vas a parquear?</h1>
+    <p class="lead">
+      Elige una opción. El precio se calcula al instante y no cambia después de pagar.
+    </p>
+
+    <div id="load-error" class="banner banner-error" role="alert" hidden></div>
+
+    <form id="ticket-form" novalidate>
+      <fieldset>
+        <legend>Tiempo de estacionamiento</legend>
+        <div
+          class="preset-grid"
+          id="preset-grid"
+          role="group"
+          aria-label="Elige cuántas horas vas a parquear"
+        ></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Placa del vehículo <span class="optional">(opcional)</span></legend>
+        <label for="plate">Nos ayuda a identificar tu vehículo si necesitas soporte</label>
+        <input
+          type="text"
+          id="plate"
+          name="plate"
+          maxlength="15"
+          autocomplete="off"
+          placeholder="Ej. A123456"
+        />
+      </fieldset>
+
+      <div class="summary-card" id="summary-card" aria-live="polite">
+        <p class="summary-label">Total a pagar</p>
+        <p class="summary-amount" id="summary-amount">Elige una opción arriba</p>
+      </div>
+
+      <p id="form-error" class="field-error" role="alert" hidden></p>
+
+      <button type="submit" class="btn btn-primary" id="pay-button" disabled>
+        Continuar y pagar de forma segura
+      </button>
+    </form>
+
+    <section class="help-section" aria-labelledby="help-title">
+      <h2 id="help-title">¿Cómo funciona?</h2>
+      <ol>
+        <li>Elige cuántas horas necesitas estacionar.</li>
+        <li>Revisa el precio total — siempre lo calcula nuestro sistema, nunca puede cambiarlo un tercero.</li>
+        <li>Paga con tarjeta de forma segura a través de Stripe.</li>
+        <li>Listo. Tu comprobante queda guardado y puedes consultarlo cuando quieras.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Tus datos de tarjeta viajan directo a Stripe: Parko nunca los ve ni los guarda.</p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
