@@ -164,6 +164,75 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /api-keys:
+    get:
+      summary: Listar mis API keys (Admin de Tenant o Admin General)
+      description: >
+        Un Admin de Tenant ve las keys de su tenant; un Admin General ve las
+        suyas propias (sin tenant). Nunca se devuelve el secreto, solo el
+        prefijo visible.
+      tags: [ApiKeys]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Lista de API keys (sin el secreto)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKeySummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Crear una API key (Admin de Tenant o Admin General)
+      description: >
+        Pensada para acceso de agentes/integraciones (ej. un servidor MCP),
+        sin login interactivo. La key hereda el alcance de quien la crea —
+        un Admin de Tenant no puede emitir una key de otro tenant ni de
+        nivel SUPER_ADMIN. El valor completo solo se devuelve aqui, una vez.
+      tags: [ApiKeys]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyInput"
+      responses:
+        "201":
+          description: API key creada (unica vez que se muestra el valor completo)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api-keys/{id}:
+    delete:
+      summary: Revocar una API key (Admin de Tenant o Admin General)
+      tags: [ApiKeys]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Key revocada (queda inutilizable de inmediato)
+        "403":
+          description: La key no pertenece a tu alcance (tenant o plataforma)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /tariffs/active:
     get:
       summary: Obtener la tarifa activa de un tenant (publico)
@@ -394,8 +463,13 @@ components:
     BearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
-      description: Token obtenido en POST /auth/login. El rol (SUPER_ADMIN, TENANT_ADMIN, TENANT_USER) y el tenant van codificados en el token, nunca se envian por separado.
+      description: >
+        Acepta dos tipos de credencial en el mismo header Authorization:
+        un JWT obtenido en POST /auth/login (sesion humana, expira), o una
+        API key con formato pk_<prefijo>_<secreto> creada en POST
+        /api-keys (para agentes/integraciones, no expira hasta revocarse).
+        En ambos casos el rol y el tenant van codificados en la credencial,
+        nunca se envian por separado.
 
   parameters:
     TicketId:
@@ -529,6 +603,38 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password, example: "una-contraseña-segura" }
         role: { type: string, enum: [TENANT_ADMIN, TENANT_USER] }
+
+    CreateApiKeyInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: "Servidor MCP" }
+        role:
+          type: string
+          enum: [TENANT_ADMIN, TENANT_USER]
+          description: Solo aplica si quien crea la key es un Admin de Tenant; un Admin General siempre obtiene una key de su propio nivel.
+
+    ApiKeySummary:
+      type: object
+      description: Nunca incluye el secreto, solo el prefijo visible.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string, example: "0a3ec807d01c" }
+        role: { type: string, enum: [SUPER_ADMIN, TENANT_ADMIN, TENANT_USER] }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    ApiKeyCreated:
+      allOf:
+        - $ref: "#/components/schemas/ApiKeySummary"
+        - type: object
+          properties:
+            key:
+              type: string
+              example: "pk_0a3ec807d01c_1fb4a76e43fcd4261b236fee15f2d9c49c1430a480268411"
+              description: Valor completo — se muestra UNA sola vez, guardalo ahora.
 
     Tariff:
       type: object

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { strictLimiter } from "../middleware/rateLimit";
 import { createTicketSchema, ticketIdParamSchema } from "../schemas/ticketSchemas";
 import { attachCheckoutSession, createTicket, getTicketById } from "../services/ticketService";
 import { createCheckoutSessionForTicket } from "../services/stripeService";
@@ -8,6 +9,7 @@ export const ticketsRouter = Router();
 
 ticketsRouter.post(
   "/",
+  strictLimiter, // evita que un agente en bucle genere tickets sin control
   asyncHandler(async (req, res) => {
     const input = createTicketSchema.parse(req.body);
     const ticket = await createTicket(input.tenantSlug, input);
@@ -26,6 +28,7 @@ ticketsRouter.get(
 
 ticketsRouter.post(
   "/:id/checkout-session",
+  strictLimiter, // evita spamear la creacion de sesiones de Stripe
   asyncHandler(async (req, res) => {
     const { id } = ticketIdParamSchema.parse(req.params);
     const ticket = await getTicketById(id);

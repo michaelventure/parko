@@ -38,6 +38,7 @@ model Tenant {
   tariffs    Tariff[]
   capacities Capacity[]
   tickets    Ticket[]
+  apiKeys    ApiKey[]
 }
 
 /// Cuenta con la que se inicia sesion (correo + contraseña). SUPER_ADMIN no
@@ -124,6 +125,28 @@ model StripeWebhookEvent {
   id         String   @id
   type       String
   receivedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+/// Credencial para acceso de maquina/agente (ej. un servidor MCP), sin
+/// necesidad de login interactivo. Hereda el rol de quien la creo: un
+/// TENANT_ADMIN solo puede emitir keys de SU tenant (TENANT_ADMIN o
+/// TENANT_USER); un SUPER_ADMIN solo emite keys SUPER_ADMIN (tenantId null).
+/// Solo se guarda el hash del secreto — el valor completo se muestra una
+/// unica vez, al crearla.
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String?
+  name       String
+  prefix     String    @unique
+  keyHash    String
+  role       UserRole
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 /// Capacidad total de espacios de parqueo de un tenant. Sin sensores:

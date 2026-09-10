@@ -39,9 +39,35 @@ solo pasa a estado `PAID` despues de verificar el pago con Stripe.
 | `TENANT_ADMIN` (Admin de Tenant) | Su propio tenant | Gestionar tarifa, capacidad y usuarios de su tenant |
 | `TENANT_USER` (Usuario) | Su propio tenant | Ver tickets/disponibilidad, crear tickets y cobros — no toca tarifa, capacidad ni usuarios |
 
-Autenticación: correo + contraseña (`bcrypt`) y un token `Bearer` (JWT) que
-lleva el rol y el `tenantId` — nunca se confía en un tenant enviado por el
-cliente para autorizar una accion administrativa.
+Autenticación: correo + contraseña (`bcrypt`) para sesiones humanas, o una
+**API key** (`pk_...`) para agentes/integraciones — ambas se mandan en el
+mismo header `Authorization: Bearer <credencial>` y llevan el rol y el
+`tenantId` codificados; nunca se confía en un tenant enviado por el cliente
+para autorizar una accion administrativa.
+
+### API keys (para agentes/integraciones, ej. un servidor MCP)
+
+Un `TENANT_ADMIN` o `SUPER_ADMIN` crea las suyas — no hay login interactivo
+para máquinas:
+
+```bash
+curl -X POST http://localhost:3000/api/api-keys -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"name":"Servidor MCP"}'
+# -> { "key": "pk_...", ... }  el valor completo solo se muestra esta vez
+```
+
+La key hereda el rol de quien la crea (nunca se puede pedir una de mayor
+alcance) y se puede revocar en cualquier momento con
+`DELETE /api/api-keys/:id`. Solo se guarda el hash del secreto — igual que
+las contraseñas, no se puede recuperar el valor completo después de creada.
+
+### Rate limiting
+
+`express-rate-limit`, en memoria (sin infraestructura nueva):
+
+- Login, crear ticket y crear sesión de checkout: **10/min por IP** (evita fuerza bruta y agentes en bucle).
+- Resto de la API: **100/min** como red de seguridad general.
+- Respuesta homologada: `429` con `{ "error": { "code": "RATE_LIMITED", ... } }`.
 
 ## Stack
 
@@ -189,12 +215,14 @@ curl http://localhost:3000/api/tickets/<ticketId>
 | Código | Cuándo |
 |---|---|
 | 200 | Lectura u operación exitosa sobre un recurso existente |
-| 201 | Recurso creado (ticket, tarifa, sesión de checkout) |
+| 201 | Recurso creado (ticket, tarifa, sesión de checkout, API key) |
+| 204 | Eliminación/revocación exitosa, sin contenido (ej. revocar una API key) |
 | 400 | Validación de entrada fallida (`VALIDATION_ERROR`) |
-| 401 | No hay sesión válida: falta el token o expiró (`UNAUTHORIZED`) |
+| 401 | No hay sesión válida: falta el token/API key, es inválido o expiró (`UNAUTHORIZED`) |
 | 403 | Hay sesión válida, pero el rol o el tenant no tiene permiso (`FORBIDDEN`) — ej. un `TENANT_USER` intentando cambiar la tarifa, o un tenant tocando datos de otro |
 | 404 | Recurso no encontrado (`NOT_FOUND`) — incluye "no hay tarifa activa" |
 | 409 | Conflicto de estado, ej. intentar cobrar un ticket ya pagado (`CONFLICT`) |
+| 429 | Demasiadas solicitudes en poco tiempo (`RATE_LIMITED`) |
 | 500 | Error interno no controlado (`INTERNAL_ERROR`), sin exponer detalles internos |
 
 Todos los errores usan el mismo formato:

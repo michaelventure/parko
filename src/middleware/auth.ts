@@ -1,26 +1,36 @@
 import { NextFunction, Request, Response } from "express";
 import type { UserRole } from "@prisma/client";
 import { verifyAuthToken } from "../lib/jwt";
+import { verifyApiKey } from "../services/apiKeyService";
 import { ForbiddenError, UnauthorizedError } from "../errors/AppError";
+import { asyncHandler } from "./asyncHandler";
 
 /**
- * Exige una sesion valida (header `Authorization: Bearer <token>`).
- * Deja el payload del token en `req.auth` para los siguientes middlewares.
+ * Exige una sesion valida (header `Authorization: Bearer <credencial>`).
+ * La credencial puede ser un token JWT (sesion humana, correo+contraseña)
+ * o una API key (`pk_...`, para agentes/integraciones) — el formato decide
+ * cual es cual. Deja el resultado en `req.auth` para los siguientes
+ * middlewares; a ambos les da la misma forma { sub, role, tenantId }.
  */
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
+export const requireAuth = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const header = req.header("authorization");
   if (!header || !header.startsWith("Bearer ")) {
     throw new UnauthorizedError("Falta el header Authorization: Bearer <token>");
   }
 
-  const token = header.slice("Bearer ".length);
-  try {
-    req.auth = verifyAuthToken(token);
-  } catch {
-    throw new UnauthorizedError("Token invalido o expirado");
+  const credential = header.slice("Bearer ".length);
+
+  if (credential.startsWith("pk_")) {
+    req.auth = await verifyApiKey(credential);
+  } else {
+    try {
+      req.auth = verifyAuthToken(credential);
+    } catch {
+      throw new UnauthorizedError("Token invalido o expirado");
+    }
   }
   next();
-}
+});
 
 /** Exige que el usuario autenticado tenga uno de los roles indicados. */
 export function requireRole(...roles: UserRole[]) {
