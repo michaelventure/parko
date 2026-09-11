@@ -17,6 +17,30 @@
   var history = [];
   var sending = false;
 
+  // Token de sesion de chat (GET /api/chat/session) — dura poco, se pide
+  // de nuevo cuando falta o expiro. Sin esto, POST /api/chat responde 401.
+  var sessionToken = null;
+  var sessionExpiresAt = 0;
+
+  async function getSessionToken(forceRefresh) {
+    if (!forceRefresh && sessionToken && Date.now() < sessionExpiresAt) {
+      return sessionToken;
+    }
+    var res = await fetch("/api/chat/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantSlug: TENANT_SLUG }),
+    });
+    if (!res.ok) {
+      throw new Error("No se pudo iniciar el chat");
+    }
+    var data = await res.json();
+    sessionToken = data.token;
+    // Se refresca un poco antes de que expire de verdad.
+    sessionExpiresAt = Date.now() + Math.max(data.expiresIn - 15, 5) * 1000;
+    return sessionToken;
+  }
+
   function escapeHtml(str) {
     var div = document.createElement("div");
     div.textContent = str;
@@ -81,11 +105,23 @@
     var thinkingEl = addMessage("assistant", "Escribiendo…");
 
     try {
+      var token = await getSessionToken(false);
       var response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantSlug: TENANT_SLUG, messages: history }),
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ messages: history }),
       });
+
+      if (response.status === 401) {
+        // El token expiro justo a tiempo — se pide uno nuevo y se reintenta una vez.
+        token = await getSessionToken(true);
+        response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ messages: history }),
+        });
+      }
+
       var data = await response.json();
 
       thinkingEl.remove();

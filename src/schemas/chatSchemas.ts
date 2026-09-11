@@ -6,7 +6,9 @@ const chatMessageSchema = z.object({
 });
 
 export const chatRequestSchema = z.object({
-  tenantSlug: z.string().trim().min(1),
+  // El tenant ya no viene del body: lo fija el token de sesion verificado
+  // en la ruta (ver src/routes/chat.ts) para que un cliente no pueda
+  // pedir el chat de un tenant que no es el suyo.
   // Limite de mensajes: acota el costo/tamaño del payload y evita que un
   // cliente reenvie un historial que crece sin control.
   messages: z.array(chatMessageSchema).min(1).max(20),
