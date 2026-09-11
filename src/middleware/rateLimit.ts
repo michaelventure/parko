@@ -32,6 +32,18 @@ export const standardLimiter = rateLimit({
 });
 
 /**
+ * El chat llama a una API de pago por token (DeepSeek) — un limite propio,
+ * mas estricto que el general, acota tanto el abuso/bucles como el costo.
+ */
+export const chatLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: sendRateLimited,
+});
+
+/**
  * Igual que standardLimiter, pero devuelve el error con forma JSON-RPC —
  * un cliente MCP espera esa forma incluso cuando la respuesta no es un
  * mensaje de protocolo real, y el envoltorio REST de sendRateLimited lo

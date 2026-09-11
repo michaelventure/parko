@@ -243,6 +243,36 @@ al terminar — así el contexto de un tenant nunca se filtra a otro).
 > incluso en el ejemplo más mínimo. No actualizar sin verificar que ese bug
 > ya se resolvió.
 
+## Chatbot (`/api/chat`, DeepSeek)
+
+Widget de chat en el frontend público (`public/chat.js`) para preguntas de
+tarifa, disponibilidad, tickets y — con confirmación explícita — crear un
+ticket y generar el link de pago.
+
+- **Sin streaming a propósito**: el bot llama tools (function calling) antes
+  de responder; parchear tool-calls a medio armar con streaming añade mucho
+  riesgo para poca ganancia en respuestas cortas de atención al cliente.
+- **Solo las 6 tools públicas** del MCP (nunca tarifa/capacidad/usuarios de
+  admin) — mismo contrato, misma llamada directa a los `services/`.
+- **La API key nunca sale del servidor**: vive en `DEEPSEEK_API_KEY`, el
+  frontend solo habla con `/api/chat`, que arma la petición a DeepSeek.
+- **Rate limit propio** (`chatLimiter`, 15/min por IP) — una API de pago por
+  token necesita un límite más estricto que el resto de la API.
+- **El "system prompt" lo controla siempre el servidor** (`src/chat/systemPrompt.ts`)
+  — el cliente solo puede mandar mensajes `user`/`assistant`, nunca `system`.
+  Incluye la fecha/hora real del servidor para que el modelo interprete
+  "el próximo lunes" o "en 3 horas" correctamente, y rechace fechas
+  inválidas (ej. 30 de febrero) en vez de adivinar.
+- Historial de conversación **en el navegador**, no en el servidor — cada
+  request reenvía los últimos mensajes (tope de 20, validado con Zod).
+
+```bash
+curl -X POST http://localhost:3000/api/chat -H "Content-Type: application/json" -d '{
+  "tenantSlug": "demo",
+  "messages": [{"role":"user","content":"cuanto cuestan 3 horas?"}]
+}'
+```
+
 ## Códigos de respuesta HTTP
 
 | Código | Cuándo |

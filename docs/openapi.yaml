@@ -442,6 +442,46 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /chat:
+    post:
+      summary: Conversar con el asistente de Parko (publico)
+      description: >
+        Chatbot con acceso exclusivamente a las mismas 6 tools publicas del
+        servidor MCP (nunca a las de administracion). El cliente reenvia el
+        historial completo en cada llamada — el servidor no guarda sesiones
+        de chat. El mensaje "system" siempre lo controla el servidor, nunca
+        el cliente.
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequestInput"
+      responses:
+        "200":
+          description: Respuesta del asistente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "502":
+          description: No se pudo conectar con el proveedor del modelo (DeepSeek)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Chat no configurado (falta DEEPSEEK_API_KEY)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /webhooks/stripe:
     post:
       summary: Webhook de Stripe (uso interno de Stripe, no invocar manualmente)
@@ -603,6 +643,21 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password, example: "una-contraseña-segura" }
         role: { type: string, enum: [TENANT_ADMIN, TENANT_USER] }
+
+    ChatRequestInput:
+      type: object
+      required: [tenantSlug, messages]
+      properties:
+        tenantSlug: { type: string, example: "demo" }
+        messages:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string, maxLength: 1000 }
 
     CreateApiKeyInput:
       type: object

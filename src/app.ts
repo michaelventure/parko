@@ -10,6 +10,7 @@ import { logger } from "./lib/logger";
 import { apiKeysRouter } from "./routes/apiKeys";
 import { authRouter } from "./routes/auth";
 import { capacityRouter } from "./routes/capacity";
+import { chatRouter } from "./routes/chat";
 import { mcpRouter } from "./routes/mcp";
 import { tariffsRouter } from "./routes/tariffs";
 import { tenantsRouter } from "./routes/tenants";
@@ -65,6 +66,7 @@ export function createApp() {
   app.use("/api/tariffs", tariffsRouter);
   app.use("/api/tickets", ticketsRouter);
   app.use("/api/capacity", capacityRouter);
+  app.use("/api/chat", chatRouter);
 
   // Servidor MCP remoto: una sola URL, cada conexion se autentica con su
   // propia API key (o ninguna, para las tools publicas).

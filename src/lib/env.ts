@@ -14,6 +14,11 @@ const envSchema = z.object({
   // tumbar el servidor — util mientras se configura una cuenta de Resend.
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(1).default("Parko <onboarding@resend.dev>"),
+  // Opcional: sin esto, el endpoint de chat responde 503 en vez de tumbar
+  // el servidor.
+  DEEPSEEK_API_KEY: z.string().min(1).optional(),
+  DEEPSEEK_API_URL: z.string().url().default("https://api.deepseek.com/chat/completions"),
+  DEEPSEEK_MODEL: z.string().min(1).default("deepseek-chat"),
 });
 
 const parsed = envSchema.safeParse(process.env);
