@@ -2,13 +2,13 @@ import { Router } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildMcpServer } from "../mcp/server";
 import { resolveMcpAuth } from "../mcp/auth";
-import { standardLimiter } from "../middleware/rateLimit";
+import { mcpLimiter } from "../middleware/rateLimit";
 import { UnauthorizedError } from "../errors/AppError";
 import { logger } from "../lib/logger";
 
 export const mcpRouter = Router();
 
-mcpRouter.use(standardLimiter);
+mcpRouter.use(mcpLimiter);
 
 /**
  * Endpoint MCP remoto, sin estado (stateless): cada request POST crea un

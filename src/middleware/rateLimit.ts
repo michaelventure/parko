@@ -30,3 +30,23 @@ export const standardLimiter = rateLimit({
   legacyHeaders: false,
   handler: sendRateLimited,
 });
+
+/**
+ * Igual que standardLimiter, pero devuelve el error con forma JSON-RPC —
+ * un cliente MCP espera esa forma incluso cuando la respuesta no es un
+ * mensaje de protocolo real, y el envoltorio REST de sendRateLimited lo
+ * confundiria.
+ */
+export const mcpLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Demasiadas solicitudes. Intenta de nuevo en un momento." },
+      id: null,
+    });
+  },
+});
