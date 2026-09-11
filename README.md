@@ -210,6 +210,39 @@ curl http://localhost:3000/api/tickets/<ticketId>
 # -> { "status": "PAID", "paidAt": "...", ... }
 ```
 
+## Servidor MCP (`/mcp`)
+
+Parko expone sus tools vía [MCP](https://modelcontextprotocol.io) en
+`POST /mcp` (JSON-RPC sobre HTTP, sin estado — no requiere `stdio` ni correr
+nada localmente). Una sola URL para todo el mundo; el rol de cada quien lo
+decide **su propia API key**:
+
+| Credencial | Tools que ve |
+|---|---|
+| Ninguna | Consulta (4) + Transaccional (2) — igual que el formulario público |
+| API key de un `TENANT_ADMIN` | + tarifa, capacidad y usuarios de **su** tenant (7) |
+| API key del `SUPER_ADMIN` | Solo gestión de tenants (4) |
+
+```bash
+# Conectar un cliente MCP (Claude Desktop, etc.) a:
+https://parko-ge6k.onrender.com/mcp
+# Header: Authorization: Bearer pk_...   (opcional — omitelo para acceso publico)
+```
+
+No hay tool de `login`, ni de crear/listar API keys — esas quedan como
+acción humana directa contra la API (`POST /api-keys`), para que el secreto
+nunca viaje dentro de la conversación de un agente. Ver
+`src/mcp/` para la implementación (cada request crea un `McpServer` nuevo,
+registra solo las tools que corresponden a la key presentada, y lo descarta
+al terminar — así el contexto de un tenant nunca se filtra a otro).
+
+> **Nota de compatibilidad:** `@modelcontextprotocol/sdk` está fijado en
+> `1.22.0` (sin `^`) a propósito. Versiones `1.23.0+` agregan soporte dual
+> zod v3/v4 que, combinado con `zod@3.25+`, dispara
+> `TS2589: Type instantiation is excessively deep` de forma reproducible
+> incluso en el ejemplo más mínimo. No actualizar sin verificar que ese bug
+> ya se resolvió.
+
 ## Códigos de respuesta HTTP
 
 | Código | Cuándo |

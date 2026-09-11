@@ -10,6 +10,7 @@ import { logger } from "./lib/logger";
 import { apiKeysRouter } from "./routes/apiKeys";
 import { authRouter } from "./routes/auth";
 import { capacityRouter } from "./routes/capacity";
+import { mcpRouter } from "./routes/mcp";
 import { tariffsRouter } from "./routes/tariffs";
 import { tenantsRouter } from "./routes/tenants";
 import { ticketsRouter } from "./routes/tickets";
@@ -64,6 +65,10 @@ export function createApp() {
   app.use("/api/tariffs", tariffsRouter);
   app.use("/api/tickets", ticketsRouter);
   app.use("/api/capacity", capacityRouter);
+
+  // Servidor MCP remoto: una sola URL, cada conexion se autentica con su
+  // propia API key (o ninguna, para las tools publicas).
+  app.use("/mcp", mcpRouter);
 
   // Frontend estatico (formulario publico + paginas de resultado de pago).
   app.use(express.static(path.join(__dirname, "..", "public")));
