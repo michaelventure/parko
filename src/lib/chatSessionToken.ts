@@ -2,7 +2,9 @@ import jwt from "jsonwebtoken";
 import { env } from "./env";
 
 const SUBJECT = "chat_session";
-const EXPIRES_IN_SECONDS = 5 * 60;
+// Corto a proposito: cuanto menos dure, menos vale la pena para alguien
+// capturar un token (via Origin spoofeado) y reusarlo fuera del widget.
+const EXPIRES_IN_SECONDS = 2 * 60;
 
 export type ChatSessionPayload = {
   tenantId: string;

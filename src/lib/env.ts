@@ -19,6 +19,9 @@ const envSchema = z.object({
   DEEPSEEK_API_KEY: z.string().min(1).optional(),
   DEEPSEEK_API_URL: z.string().url().default("https://api.deepseek.com/chat/completions"),
   DEEPSEEK_MODEL: z.string().min(1).default("deepseek-chat"),
+  // Tope de respaldo contra el costo de DeepSeek, independiente de que la
+  // autenticacion del chat funcione o no (ver chatUsageService.ts).
+  CHAT_DAILY_MESSAGE_LIMIT: z.coerce.number().int().positive().default(200),
 });
 
 const parsed = envSchema.safeParse(process.env);

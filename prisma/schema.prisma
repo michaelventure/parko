@@ -39,6 +39,22 @@ model Tenant {
   capacities Capacity[]
   tickets    Ticket[]
   apiKeys    ApiKey[]
+  chatUsages ChatUsage[]
+}
+
+/// Contador de mensajes de chat por tenant y dia (UTC) — tope de respaldo
+/// contra el costo de DeepSeek que aplica pase lo que pase con la
+/// autenticacion del endpoint (ver src/services/chatUsageService.ts).
+model ChatUsage {
+  id           String   @id @default(uuid())
+  tenantId     String
+  usageDate    String // "YYYY-MM-DD" en UTC
+  messageCount Int      @default(0)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, usageDate])
 }
 
 /// Cuenta con la que se inicia sesion (correo + contraseña). SUPER_ADMIN no

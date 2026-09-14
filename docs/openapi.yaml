@@ -452,7 +452,7 @@ paths:
         porque el servidor manda Referrer-Policy: no-referrer. Solo
         responde si el Origin apunta al mismo host que sirvio la pagina —
         asi un script externo no puede conseguir un token fuera del flujo
-        del frontend. El token dura 5 minutos y queda ligado al tenant
+        del frontend. El token dura 2 minutos y queda ligado al tenant
         resuelto por tenantSlug.
       tags: [Chat]
       requestBody:
@@ -473,7 +473,7 @@ paths:
                 type: object
                 properties:
                   token: { type: string }
-                  expiresIn: { type: integer, example: 300 }
+                  expiresIn: { type: integer, example: 120 }
         "400":
           $ref: "#/components/responses/ValidationError"
         "403":
@@ -493,8 +493,10 @@ paths:
         servidor MCP (nunca a las de administracion). El cliente reenvia el
         historial completo en cada llamada — el servidor no guarda sesiones
         de chat. El mensaje "system" siempre lo controla el servidor, nunca
-        el cliente. El tenant lo fija el token de GET /chat/session (header
-        Authorization: Bearer <token>), no el body.
+        el cliente. El tenant lo fija el token de POST /chat/session (header
+        Authorization: Bearer <token>), no el body. Cada tenant tiene un
+        tope diario de mensajes (CHAT_DAILY_MESSAGE_LIMIT, respaldo contra
+        el costo de DeepSeek independiente de la autenticacion).
       tags: [Chat]
       security:
         - chatSessionToken: []
@@ -517,6 +519,12 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: El tenant alcanzo su tope diario de mensajes de chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "502":
           description: No se pudo conectar con el proveedor del modelo (DeepSeek)
           content:
