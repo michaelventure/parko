@@ -442,16 +442,62 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /chat/session:
+    post:
+      summary: Obtener un token de sesion de chat (publico, solo desde el propio sitio)
+      description: >
+        El widget de Parko lo llama antes de mostrar el chat. Es POST (no
+        GET) porque solo en metodos "unsafe" los navegadores garantizan el
+        header Origin en una request same-origin; Referer no sirve aqui
+        porque el servidor manda Referrer-Policy: no-referrer. Solo
+        responde si el Origin apunta al mismo host que sirvio la pagina —
+        asi un script externo no puede conseguir un token fuera del flujo
+        del frontend. El token dura 5 minutos y queda ligado al tenant
+        resuelto por tenantSlug.
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantSlug]
+              properties:
+                tenantSlug: { type: string, example: "demo" }
+      responses:
+        "200":
+          description: Token de sesion de chat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  expiresIn: { type: integer, example: 300 }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No existe un tenant activo con ese slug
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /chat:
     post:
-      summary: Conversar con el asistente de Parko (publico)
+      summary: Conversar con el asistente de Parko (requiere token de sesion de chat)
       description: >
         Chatbot con acceso exclusivamente a las mismas 6 tools publicas del
         servidor MCP (nunca a las de administracion). El cliente reenvia el
         historial completo en cada llamada — el servidor no guarda sesiones
         de chat. El mensaje "system" siempre lo controla el servidor, nunca
-        el cliente.
+        el cliente. El tenant lo fija el token de GET /chat/session (header
+        Authorization: Bearer <token>), no el body.
       tags: [Chat]
+      security:
+        - chatSessionToken: []
       requestBody:
         required: true
         content:
@@ -469,6 +515,8 @@ paths:
                   message: { type: string }
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "502":
           description: No se pudo conectar con el proveedor del modelo (DeepSeek)
           content:
@@ -510,6 +558,14 @@ components:
         /api-keys (para agentes/integraciones, no expira hasta revocarse).
         En ambos casos el rol y el tenant van codificados en la credencial,
         nunca se envian por separado.
+    chatSessionToken:
+      type: http
+      scheme: bearer
+      description: >
+        JWT de corta duracion (5 min) obtenido en GET /chat/session. Distinto
+        de BearerAuth: no representa una sesion de usuario ni una API key,
+        solo autoriza mensajes de chat para el tenant que quedo codificado
+        al pedirlo.
 
   parameters:
     TicketId:
@@ -646,9 +702,8 @@ components:
 
     ChatRequestInput:
       type: object
-      required: [tenantSlug, messages]
+      required: [messages]
       properties:
-        tenantSlug: { type: string, example: "demo" }
         messages:
           type: array
           maxItems: 20
