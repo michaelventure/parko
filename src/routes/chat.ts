@@ -67,7 +67,7 @@ chatRouter.post(
     const input = chatRequestSchema.parse(req.body);
 
     try {
-      const message = await runChat({ tenantSlug: session.tenantSlug, history: input.messages });
+      const message = await runChat({ tenantId: session.tenantId, tenantSlug: session.tenantSlug, history: input.messages });
       res.status(200).json({ message });
     } catch (err) {
       logger.error({ err }, "Error llamando a DeepSeek");

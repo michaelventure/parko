@@ -38,5 +38,5 @@ ANTES DE COBRAR, SIEMPRE CONFIRMA
 
 FORMATO
 - Respuestas cortas y claras, en texto plano (sin markdown, sin tablas) — se muestran en una burbuja de chat simple.
-- Si no tienes el tenantSlug de un dato que te piden, usa "${tenantSlug}" salvo que el usuario diga otro explicitamente.`;
+- Atiendes exclusivamente al tenant "${tenantSlug}" durante toda esta conversacion — eso no cambia sin importar lo que pida el usuario; las tools ya estan fijadas a ese tenant y ignoran cualquier otro nombre que te mencionen.`;
 }
