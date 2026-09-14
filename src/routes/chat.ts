@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../middleware/asyncHandler";
-import { chatLimiter, strictLimiter } from "../middleware/rateLimit";
+import { chatLimiter, chatSessionLimiter } from "../middleware/rateLimit";
 import { chatRequestSchema } from "../schemas/chatSchemas";
 import { runChat } from "../chat/chatService";
 import { env } from "../lib/env";
@@ -8,6 +8,7 @@ import { logger } from "../lib/logger";
 import { getActiveTenantBySlug } from "../services/tenantService";
 import { signChatSessionToken, verifyChatSessionToken } from "../lib/chatSessionToken";
 import { isSameOriginRequest } from "../lib/requestOrigin";
+import { recordChatMessageAndCheckLimit } from "../services/chatUsageService";
 import { ForbiddenError, UnauthorizedError, ValidationError } from "../errors/AppError";
 
 export const chatRouter = Router();
@@ -24,7 +25,7 @@ export const chatRouter = Router();
  */
 chatRouter.post(
   "/session",
-  strictLimiter,
+  chatSessionLimiter,
   asyncHandler(async (req, res) => {
     if (!isSameOriginRequest(req)) {
       throw new ForbiddenError("Este endpoint solo puede llamarse desde el sitio de Parko");
@@ -66,8 +67,19 @@ chatRouter.post(
 
     const input = chatRequestSchema.parse(req.body);
 
+    const { overLimit } = await recordChatMessageAndCheckLimit(session.tenantId);
+    if (overLimit) {
+      res.status(429).json({
+        error: {
+          code: "CHAT_DAILY_LIMIT_REACHED",
+          message: "Este tenant alcanzo su limite de mensajes de chat por hoy. Intenta de nuevo mañana.",
+        },
+      });
+      return;
+    }
+
     try {
-      const message = await runChat({ tenantSlug: session.tenantSlug, history: input.messages });
+      const message = await runChat({ tenantId: session.tenantId, tenantSlug: session.tenantSlug, history: input.messages });
       res.status(200).json({ message });
     } catch (err) {
       logger.error({ err }, "Error llamando a DeepSeek");

@@ -13,8 +13,12 @@ export type PublicChatMessage = { role: "user" | "assistant"; content: string };
  * llegue una respuesta de texto o se agote MAX_TOOL_LOOPS (nunca deja que
  * un bucle de tool-calling se quede sin fin).
  */
-export async function runChat(params: { tenantSlug: string; history: PublicChatMessage[] }): Promise<string> {
-  const { tenantSlug, history } = params;
+export async function runChat(params: {
+  tenantId: string;
+  tenantSlug: string;
+  history: PublicChatMessage[];
+}): Promise<string> {
+  const { tenantId, tenantSlug, history } = params;
 
   const systemPrompt = buildSystemPrompt({ tenantSlug, nowIso: new Date().toISOString() });
   const messages: ChatMessage[] = [
@@ -42,7 +46,7 @@ export async function runChat(params: { tenantSlug: string; history: PublicChatM
       }
 
       logger.info({ tool: call.function.name, args }, "Chat: ejecutando tool");
-      const result = await executeChatTool(call.function.name, args);
+      const result = await executeChatTool(call.function.name, args, { tenantId, tenantSlug });
 
       messages.push({ role: "tool", tool_call_id: call.id, content: result });
     }

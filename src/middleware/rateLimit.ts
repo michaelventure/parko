@@ -44,6 +44,21 @@ export const chatLimiter = rateLimit({
 });
 
 /**
+ * Solo para POST /api/chat/session. Mas estricto que strictLimiter (que
+ * comparten login/tickets/checkout) porque ademas de ser sin autenticacion,
+ * es el unico paso que emite tokens de chat — limitar cuantos puede pedir
+ * una IP por minuto acota directamente cuantas conversaciones puede abrir
+ * un script, sin importar si logra pasar el chequeo de Origin.
+ */
+export const chatSessionLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: sendRateLimited,
+});
+
+/**
  * Igual que standardLimiter, pero devuelve el error con forma JSON-RPC —
  * un cliente MCP espera esa forma incluso cuando la respuesta no es un
  * mensaje de protocolo real, y el envoltorio REST de sendRateLimited lo

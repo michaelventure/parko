@@ -4,25 +4,29 @@ import { getAvailabilityForSlug } from "../services/capacityService";
 import { getTicketById, createTicket, attachCheckoutSession } from "../services/ticketService";
 import { createCheckoutSessionForTicket } from "../services/stripeService";
 import { calculateAmountCents } from "../services/pricing";
-import { AppError } from "../errors/AppError";
+import { AppError, NotFoundError } from "../errors/AppError";
+
+/** Tenant real de la sesion de chat verificada (ver src/lib/chatSessionToken.ts) — nunca el que decida el modelo. */
+export type ChatToolSession = { tenantId: string; tenantSlug: string };
 
 /**
  * Las mismas 6 tools públicas que expone el servidor MCP (ver
  * src/mcp/tools/consulta.ts y transaccional.ts) — mismo contrato, mismos
  * services por debajo. El chat nunca tiene acceso a las tools de
  * administración: no existen en esta lista.
+ *
+ * Ninguna tool recibe tenantSlug como parametro del modelo: el tenant lo
+ * fija siempre la sesion verificada (dispatchTool abajo), para que un
+ * usuario no pueda, via inyeccion de prompt, hacer que el asistente lea o
+ * accione datos de OTRO tenant.
  */
 export const CHAT_TOOLS: ToolSpec[] = [
   {
     type: "function",
     function: {
       name: "get_active_tariff",
-      description: "Tarifa vigente de un tenant: precio por hora, tope diario y moneda.",
-      parameters: {
-        type: "object",
-        properties: { tenantSlug: { type: "string" } },
-        required: ["tenantSlug"],
-      },
+      description: "Tarifa vigente del tenant: precio por hora, tope diario y moneda.",
+      parameters: { type: "object", properties: {} },
     },
   },
   {
@@ -34,10 +38,9 @@ export const CHAT_TOOLS: ToolSpec[] = [
       parameters: {
         type: "object",
         properties: {
-          tenantSlug: { type: "string" },
           hours: { type: "number", minimum: 0.5, maximum: 24, description: "Horas de estacionamiento" },
         },
-        required: ["tenantSlug", "hours"],
+        required: ["hours"],
       },
     },
   },
@@ -57,12 +60,8 @@ export const CHAT_TOOLS: ToolSpec[] = [
     type: "function",
     function: {
       name: "get_availability",
-      description: "Espacios totales y disponibles ahora mismo en un tenant.",
-      parameters: {
-        type: "object",
-        properties: { tenantSlug: { type: "string" } },
-        required: ["tenantSlug"],
-      },
+      description: "Espacios totales y disponibles ahora mismo en el tenant.",
+      parameters: { type: "object", properties: {} },
     },
   },
   {
@@ -74,11 +73,10 @@ export const CHAT_TOOLS: ToolSpec[] = [
       parameters: {
         type: "object",
         properties: {
-          tenantSlug: { type: "string" },
           hours: { type: "number", minimum: 0.5, maximum: 24 },
           plate: { type: "string", description: "Placa del vehiculo (opcional)" },
         },
-        required: ["tenantSlug", "hours"],
+        required: ["hours"],
       },
     },
   },
@@ -96,10 +94,10 @@ export const CHAT_TOOLS: ToolSpec[] = [
   },
 ];
 
-/** Ejecuta una tool por nombre. Nunca lanza: los errores de negocio vuelven como texto legible. */
-export async function executeChatTool(name: string, args: Record<string, unknown>): Promise<string> {
+/** Ejecuta una tool por nombre, siempre acotada al tenant de la sesion. Nunca lanza: los errores de negocio vuelven como texto legible. */
+export async function executeChatTool(name: string, args: Record<string, unknown>, session: ChatToolSession): Promise<string> {
   try {
-    const result = await dispatchTool(name, args);
+    const result = await dispatchTool(name, args, session);
     return JSON.stringify(result);
   } catch (err) {
     if (err instanceof AppError) {
@@ -109,13 +107,26 @@ export async function executeChatTool(name: string, args: Record<string, unknown
   }
 }
 
-async function dispatchTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+/**
+ * Carga un ticket y confirma que pertenezca al tenant de la sesion. Se
+ * responde 404 (no "no autorizado") para no confirmarle a quien pregunta
+ * que el ticket existe en otro tenant.
+ */
+async function getOwnTicketOrThrow(ticketId: string, session: ChatToolSession) {
+  const ticket = await getTicketById(ticketId);
+  if (ticket.tenantId !== session.tenantId) {
+    throw new NotFoundError("Ticket");
+  }
+  return ticket;
+}
+
+async function dispatchTool(name: string, args: Record<string, unknown>, session: ChatToolSession): Promise<unknown> {
   switch (name) {
     case "get_active_tariff":
-      return getActiveTariffForSlug(String(args.tenantSlug));
+      return getActiveTariffForSlug(session.tenantSlug);
 
     case "estimate_price": {
-      const tariff = await getActiveTariffForSlug(String(args.tenantSlug));
+      const tariff = await getActiveTariffForSlug(session.tenantSlug);
       const hours = Number(args.hours);
       const amountCents = calculateAmountCents({
         ratePerHourCents: tariff.ratePerHourCents,
@@ -126,24 +137,22 @@ async function dispatchTool(name: string, args: Record<string, unknown>): Promis
     }
 
     case "get_ticket_status":
-      return getTicketById(String(args.ticketId));
+      return getOwnTicketOrThrow(String(args.ticketId), session);
 
     case "get_availability":
-      return getAvailabilityForSlug(String(args.tenantSlug));
+      return getAvailabilityForSlug(session.tenantSlug);
 
     case "create_ticket": {
-      const tenantSlug = String(args.tenantSlug);
       const hours = Number(args.hours);
       const plate = typeof args.plate === "string" ? args.plate : undefined;
-      return createTicket(tenantSlug, { tenantSlug, hours, plate });
+      return createTicket(session.tenantSlug, { tenantSlug: session.tenantSlug, hours, plate });
     }
 
     case "create_checkout_session": {
-      const ticketId = String(args.ticketId);
-      const ticket = await getTicketById(ticketId);
-      const session = await createCheckoutSessionForTicket(ticket);
-      await attachCheckoutSession(ticket.id, session.id);
-      return { checkoutUrl: session.url, sessionId: session.id };
+      const ticket = await getOwnTicketOrThrow(String(args.ticketId), session);
+      const checkoutSession = await createCheckoutSessionForTicket(ticket);
+      await attachCheckoutSession(ticket.id, checkoutSession.id);
+      return { checkoutUrl: checkoutSession.url, sessionId: checkoutSession.id };
     }
 
     default:
